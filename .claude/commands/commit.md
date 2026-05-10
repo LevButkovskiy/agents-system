@@ -24,10 +24,10 @@ Sync CLAUDE.md, stage all changes, and prepare a conventional commit message —
 
 5. Write a commit message:
    - Subject line: `<type>(<scope>): <short imperative summary>` — max 72 chars, no period
-   - Body (optional): one or two lines explaining *why*, not *what* — only if non-obvious
-   - Always append: `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
+   - Body (optional): max 1-2 sentences, plain language, no bullet points — only if the subject alone isn't enough
 
 6. Write the message to `.git/COMMIT_EDITMSG` using a HEREDOC so it pre-populates the next `git commit`:
+
    ```
    cat <<'EOF' > .git/COMMIT_EDITMSG
    <subject line>
@@ -37,6 +37,7 @@ Sync CLAUDE.md, stage all changes, and prepare a conventional commit message —
    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
    EOF
    ```
+
    Do NOT run `git commit`. Stop here.
 
 7. Show the prepared message to the user and tell them to run `git commit` to finalize.

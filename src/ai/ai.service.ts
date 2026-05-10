@@ -1,15 +1,16 @@
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import {
+  BaseCheckpointSaver,
   ConditionalEdgeRouter,
   END,
-  MemorySaver,
   START,
   StateGraph,
 } from '@langchain/langgraph';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { CHECKPOINTER } from './ai.constants';
 import { getModel } from './models';
 import { createLlmNode } from './nodes/llm.node';
 import { createToolNode } from './nodes/tool.node';
@@ -35,11 +36,13 @@ const shouldContinue: ConditionalEdgeRouter<AppState> = (state) => {
   return END;
 };
 
-const buildAgent = (configService: ConfigService) => {
+const buildAgent = (
+  configService: ConfigService,
+  checkpointer: BaseCheckpointSaver,
+) => {
   const model = getModel(configService, { tools: true });
   const llmNode = createLlmNode(model);
   const toolNode = createToolNode();
-  const checkpointer = new MemorySaver();
 
   return new StateGraph(State)
     .addNode(NODES.LLM_CALL, llmNode)
@@ -55,12 +58,17 @@ export class AiService implements OnModuleInit {
   private readonly logger = new Logger('AiService');
   private agent: ReturnType<typeof buildAgent>;
 
-  constructor(configService: ConfigService) {
-    this.agent = buildAgent(configService);
+  constructor(
+    configService: ConfigService,
+    @Inject(CHECKPOINTER) checkpointer: BaseCheckpointSaver,
+  ) {
+    this.agent = buildAgent(configService, checkpointer);
   }
 
   async onModuleInit() {
-    await this.saveGraphDiagram();
+    if (process.env.NODE_ENV !== 'production') {
+      await this.saveGraphDiagram();
+    }
   }
 
   async run(input: string, threadId: string) {

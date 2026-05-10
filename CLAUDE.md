@@ -51,7 +51,8 @@ Supervisor (LLM routes to subgraphs), Swarm (`Command({ goto })`), Parallel (`Se
 ## Environment Variables
 
 See `.env.example`. Required: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`.
-Optional: `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`.
+Optional: `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `NODE_ENV`.
+Production only: `DATABASE_URL` (PostgreSQL, for persistent checkpointing).
 Never commit `.env`.
 
 ## Testing
