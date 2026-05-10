@@ -5,9 +5,7 @@ import { AppState } from '../state';
 export const createLlmNode = (model: Runnable<BaseMessage[], BaseMessage>) => {
   return async (state: AppState) => {
     const response = await model.invoke([
-      new SystemMessage(
-        'You are a helpful assistant tasked with performing arithmetic on a set of inputs.',
-      ),
+      new SystemMessage('You are a helpful personal assistant'),
       ...state.messages,
     ]);
 
