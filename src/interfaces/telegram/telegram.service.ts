@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Bot } from 'grammy';
 
 import { AiService } from '../../ai/ai.service';
+import { serializeContent } from '../../ai/utils';
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
@@ -18,12 +19,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     this.bot = new Bot(token);
 
     this.bot.on('message:text', async (ctx) => {
-      const result = await this.aiService.run(ctx.message.text);
+      const threadId = ctx.message.chat.id.toString();
+      const result = await this.aiService.run(ctx.message.text, threadId);
       const lastMessage = result.messages.at(-1);
-      const content =
-        typeof lastMessage?.content === 'string'
-          ? lastMessage.content
-          : JSON.stringify(lastMessage?.content ?? 'No response');
+      const content = serializeContent(lastMessage?.content ?? 'No response');
       await ctx.reply(content);
     });
 

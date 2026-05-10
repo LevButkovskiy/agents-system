@@ -1,11 +1,7 @@
-import { add } from './add';
-import { divide } from './divide';
-import { multiply } from './multiply';
+import { currentDate } from './current-date';
 
 const toolsByName = {
-  [add.name]: add,
-  [multiply.name]: multiply,
-  [divide.name]: divide,
+  [currentDate.name]: currentDate,
 };
 
 const tools = Object.values(toolsByName);
