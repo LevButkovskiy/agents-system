@@ -2,6 +2,7 @@ export default () => ({
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
+    baseUrl: process.env.ANTHROPIC_BASE_URL,
   },
   gemini: {
     apiKey: process.env.PROXYAPI_KEY,
