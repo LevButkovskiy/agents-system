@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped

@@ -55,7 +55,11 @@ export class TelegramService
 
   onModuleInit() {
     const token = this.configService.getOrThrow<string>('telegram.botToken');
-    this.bot = new Bot<Context>(token);
+    const apiRoot = this.configService.get<string>('telegram.apiHost');
+    this.bot = new Bot<Context>(
+      token,
+      apiRoot ? { client: { apiRoot } } : undefined,
+    );
     void this.bot.api.setMyCommands([
       { command: 'start', description: 'Start the assistant' },
       { command: 'help', description: 'Show available commands' },
@@ -263,7 +267,8 @@ export class TelegramService
 
   private async fetchPhotoData(fileId: string): Promise<PhotoData> {
     const file = await this.bot.api.getFile(fileId);
-    const url = `https://api.telegram.org/file/bot${this.bot.token}/${file.file_path!}`;
+    const apiHost = this.configService.get<string>('telegram.apiHost');
+    const url = `${apiHost}/file/bot${this.bot.token}/${file.file_path!}`;
     const response = await fetch(url);
     const raw = response.headers.get('content-type') ?? '';
     const mimeType = this.normalizeImageMimeType(raw);

@@ -11,6 +11,7 @@ export default () => ({
   },
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN,
+    apiHost: process.env.TELEGRAM_API_HOST ?? 'https://api.telegram.org',
   },
   model: process.env.MODEL ?? 'anthropic',
 });
