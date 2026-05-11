@@ -1,3 +1,8 @@
 export interface ReminderNotifier {
-  sendReminder(userId: string, text: string): Promise<void>;
+  sendReminder(dto: SendReminderDto): Promise<void>;
+}
+
+export interface SendReminderDto {
+  userId: string;
+  text: string;
 }

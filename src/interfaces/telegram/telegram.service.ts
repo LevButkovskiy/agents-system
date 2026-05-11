@@ -12,8 +12,17 @@ import { Bot, Context, InlineKeyboard, InputFile } from 'grammy';
 import type { AiAgentResult, IAgentService } from '../../ai/agent.interface';
 import { AGENT_SERVICE } from '../../ai/ai.constants';
 import { ImageArtifact } from '../../ai/ai.state';
-import type { ReminderNotifier } from '../../notifications/reminder-notifier.interface';
+import { ConversationsService } from '../../conversations/conversations.service';
+import type {
+  ReminderNotifier,
+  SendReminderDto,
+} from '../../notifications/reminder-notifier.interface';
 import { serializeContent, toTelegramMarkdownV2 } from '../../shared/utils';
+import {
+  UserIdentity,
+  UserIdentityProvider,
+} from '../../users/user-identity.entity';
+import { UsersService } from '../../users/users.service';
 
 const ALBUM_FLUSH_MS = 1500;
 
@@ -40,11 +49,18 @@ export class TelegramService
   constructor(
     private readonly configService: ConfigService,
     @Inject(AGENT_SERVICE) private readonly agentService: IAgentService,
+    private readonly usersService: UsersService,
+    private readonly conversationsService: ConversationsService,
   ) {}
 
   onModuleInit() {
     const token = this.configService.getOrThrow<string>('telegram.botToken');
     this.bot = new Bot<Context>(token);
+    void this.bot.api.setMyCommands([
+      { command: 'start', description: 'Start the assistant' },
+      { command: 'help', description: 'Show available commands' },
+      { command: 'reset', description: 'Reset the current chat session' },
+    ]);
 
     this.bot.on('message:text', async (ctx) => {
       try {
@@ -87,16 +103,56 @@ export class TelegramService
     await this.bot.stop();
   }
 
-  async sendReminder(userId: string, text: string): Promise<void> {
-    await this.bot.api.sendMessage(userId, toTelegramMarkdownV2(text), {
+  async sendReminder({ userId, text }: SendReminderDto): Promise<void> {
+    const identity = await this.usersService.findIdentity({
+      userId,
+      provider: UserIdentityProvider.Telegram,
+    });
+    const chatId = identity?.providerChatId ?? identity?.providerUserId;
+
+    if (!chatId) {
+      throw new Error(`Telegram identity not found for user ${userId}`);
+    }
+
+    await this.bot.api.sendMessage(chatId, toTelegramMarkdownV2(text), {
       parse_mode: 'MarkdownV2',
     });
   }
 
   private async handleTextMessage(ctx: Context) {
     const text = ctx.message!.text!;
-    const options = this.getRunOptions(ctx);
+    if (await this.handleCommand(ctx, text)) return;
+
+    const options = await this.getRunOptions(ctx);
     await this.sendResult(ctx, await this.agentService.run(text, options));
+  }
+
+  private async handleCommand(ctx: Context, text: string): Promise<boolean> {
+    const command = text.split(/\s+/, 1)[0].toLowerCase();
+
+    if (command === '/start' || command === '/help') {
+      await ctx.reply(
+        [
+          'Available commands:',
+          '/reset - reset the current chat session without changing long-term memory',
+        ].join('\n'),
+      );
+      return true;
+    }
+
+    if (command !== '/reset') return false;
+
+    const providerChatId = ctx.chat!.id.toString();
+    const identity = await this.resolveTelegramIdentity(ctx);
+
+    await this.conversationsService.resetActiveSession({
+      userId: identity.userId,
+      provider: UserIdentityProvider.Telegram,
+      providerChatId,
+    });
+
+    await ctx.reply('Session reset. Long-term memory was not changed.');
+    return true;
   }
 
   private async handlePhotoMessage(ctx: Context) {
@@ -115,7 +171,7 @@ export class TelegramService
 
   private async handleCallbackQuery(ctx: Context) {
     const data = ctx.callbackQuery!.data!;
-    const options = this.getRunOptions(ctx);
+    const options = await this.getRunOptions(ctx);
 
     await ctx.answerCallbackQuery();
     await ctx.deleteMessage();
@@ -187,7 +243,7 @@ export class TelegramService
     photos: PhotoData[],
     caption: string | undefined,
   ) {
-    const options = this.getRunOptions(ctx);
+    const options = await this.getRunOptions(ctx);
     const contextImages = photos.map((p) => ({
       data: p.base64,
       mimeType: p.mimeType,
@@ -264,8 +320,34 @@ export class TelegramService
     );
   }
 
-  private getRunOptions(ctx: Context) {
-    const id = ctx.chat!.id.toString();
-    return { threadId: id, userId: id };
+  private async getRunOptions(ctx: Context) {
+    const providerChatId = ctx.chat!.id.toString();
+    const identity = await this.resolveTelegramIdentity(ctx);
+
+    const session = await this.conversationsService.getActiveSession({
+      userId: identity.userId,
+      provider: UserIdentityProvider.Telegram,
+      providerChatId,
+    });
+
+    return { threadId: session.threadId, userId: identity.userId };
+  }
+
+  private resolveTelegramIdentity(ctx: Context): Promise<UserIdentity> {
+    const from = ctx.from;
+    if (!from) throw new Error('Telegram user is missing from context');
+
+    return this.usersService.resolveIdentity({
+      provider: UserIdentityProvider.Telegram,
+      providerUserId: from.id.toString(),
+      providerChatId: ctx.chat!.id.toString(),
+      username: from.username,
+      displayName: [from.first_name, from.last_name].filter(Boolean).join(' '),
+      locale: from.language_code,
+      metadata: {
+        isBot: from.is_bot,
+        chatType: ctx.chat!.type,
+      },
+    });
   }
 }

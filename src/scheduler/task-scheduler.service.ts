@@ -38,10 +38,10 @@ export class TaskSchedulerService {
 
   private async sendDueTask(task: Task) {
     try {
-      await this.reminderNotifier.sendReminder(
-        task.userId,
-        `Reminder: ${task.text}`,
-      );
+      await this.reminderNotifier.sendReminder({
+        userId: task.userId,
+        text: `Reminder: ${task.text}`,
+      });
       await this.tasksService.complete({
         id: task.id,
         userId: task.userId,
