@@ -2,11 +2,14 @@ import { MemorySaver } from '@langchain/langgraph';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GeminiModule } from '../connectors/gemini/gemini.module';
 import { CHECKPOINTER } from './ai.constants';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
+import { ToolsService } from './tools';
 
 @Module({
+  imports: [GeminiModule],
   controllers: [AiController],
   providers: [
     {
@@ -23,6 +26,7 @@ import { AiService } from './ai.service';
       },
       inject: [ConfigService],
     },
+    ToolsService,
     AiService,
   ],
   exports: [AiService],

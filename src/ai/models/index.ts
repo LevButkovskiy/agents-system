@@ -1,6 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
+import { StructuredToolInterface } from '@langchain/core/tools';
 import { ConfigService } from '@nestjs/config';
-import { tools } from '../tools';
 import createAnthropicModel from './anthropic';
 
 type ModelVariations = ChatAnthropic;
@@ -15,7 +15,7 @@ const models: Models = {
 
 const getModel = (
   configService: ConfigService,
-  options?: { tools?: boolean },
+  tools?: StructuredToolInterface[],
 ) => {
   const configModel = configService.get<string>('model');
   const modelName = (configModel ?? 'anthropic') as keyof Models;
@@ -25,7 +25,7 @@ const getModel = (
 
   const model = modelFn(configService);
 
-  if (options?.tools) {
+  if (tools?.length) {
     return model.bindTools(tools);
   }
   return model;
