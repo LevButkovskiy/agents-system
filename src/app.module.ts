@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AiModule } from './ai/ai.module';
-import configuration from './ai/configuration';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import configuration from './configuration';
 import { TelegramModule } from './interfaces/telegram/telegram.module';
 
 @Module({
@@ -16,7 +14,5 @@ import { TelegramModule } from './interfaces/telegram/telegram.module';
     AiModule,
     TelegramModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

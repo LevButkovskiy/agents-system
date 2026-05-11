@@ -1,4 +1,5 @@
 export default () => ({
+  NODE_ENV: process.env.NODE_ENV ?? 'development',
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY,
   },
@@ -9,6 +10,7 @@ export default () => ({
     url: process.env.DATABASE_URL,
   },
   telegram: {
-    streaming: process.env.TELEGRAM_STREAMING === 'true',
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
   },
+  model: process.env.MODEL ?? 'anthropic',
 });

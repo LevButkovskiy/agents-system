@@ -1,20 +1,16 @@
 import { StructuredToolInterface } from '@langchain/core/tools';
-import { Injectable } from '@nestjs/common';
-import { GeminiService } from '../../connectors/gemini/gemini.service';
+import { Inject, Injectable } from '@nestjs/common';
 import { currentDate } from './current-date';
-import { createImageEditorTool } from './image-editor';
-import { createImageGeneratorTool } from './image-generator';
+import { GEMINI_TOOLS_TOKEN } from './tools.constants';
 
 @Injectable()
 export class ToolsService {
   private readonly tools: StructuredToolInterface[];
 
-  constructor(geminiService: GeminiService) {
-    this.tools = [
-      currentDate,
-      createImageGeneratorTool(geminiService),
-      createImageEditorTool(geminiService),
-    ];
+  constructor(
+    @Inject(GEMINI_TOOLS_TOKEN) geminiTools: StructuredToolInterface[],
+  ) {
+    this.tools = [currentDate, ...geminiTools];
   }
 
   getTools(): StructuredToolInterface[] {

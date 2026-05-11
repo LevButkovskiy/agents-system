@@ -1,7 +1,6 @@
-import { autoRetry } from '@grammyjs/auto-retry';
-import { stream, StreamFlavor } from '@grammyjs/stream';
 import { HumanMessage } from '@langchain/core/messages';
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -10,11 +9,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Bot, Context, InputFile } from 'grammy';
 
-import { AiService } from '../../ai/ai.service';
+import { AGENT_SERVICE } from '../../ai/ai.constants';
+import type { AgentResult, IAgentService } from '../../ai/agent.interface';
 import { ImageArtifact } from '../../ai/state';
-import { serializeContent } from '../../ai/utils';
-
-type BotContext = StreamFlavor<Context>;
+import { serializeContent } from '../../shared/utils';
 
 const ALBUM_FLUSH_MS = 1500;
 
@@ -26,35 +24,23 @@ interface PhotoData {
 interface AlbumBuffer {
   photos: Promise<PhotoData>[];
   caption?: string;
-  ctx: BotContext;
+  ctx: Context;
   timer?: ReturnType<typeof setTimeout>;
 }
 
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
-  private bot: Bot<BotContext>;
-  private readonly streamingEnabled: boolean;
+  private bot: Bot<Context>;
   private readonly albumBuffers = new Map<string, AlbumBuffer>();
-
   constructor(
     private readonly configService: ConfigService,
-    private readonly aiService: AiService,
-  ) {
-    this.streamingEnabled = this.configService.get<boolean>(
-      'telegram.streaming',
-      false,
-    );
-  }
+    @Inject(AGENT_SERVICE) private readonly agentService: IAgentService,
+  ) {}
 
   onModuleInit() {
-    const token = this.configService.getOrThrow<string>('TELEGRAM_BOT_TOKEN');
-    this.bot = new Bot<BotContext>(token);
-
-    if (this.streamingEnabled) {
-      this.bot.api.config.use(autoRetry());
-      this.bot.use(stream());
-    }
+    const token = this.configService.getOrThrow<string>('telegram.botToken');
+    this.bot = new Bot<Context>(token);
 
     this.bot.on('message:text', async (ctx) => {
       try {
@@ -89,18 +75,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     await this.bot.stop();
   }
 
-  private async handleTextMessage(ctx: BotContext) {
+  private async handleTextMessage(ctx: Context) {
     const text = ctx.message!.text!;
-    const threadId = ctx.chat!.id.toString();
-
-    if (this.streamingEnabled && ctx.chat?.type === 'private') {
-      await ctx.replyWithStream(this.aiService.stream(text, threadId));
-    } else {
-      await this.sendResult(ctx, await this.aiService.run(text, threadId));
-    }
+    const threadId = this.getThreadId(ctx);
+    await this.sendResult(ctx, await this.agentService.run(text, threadId));
   }
 
-  private async handlePhotoMessage(ctx: BotContext) {
+  private async handlePhotoMessage(ctx: Context) {
     const photo = ctx.message!.photo!.at(-1)!;
     const caption = ctx.message!.caption;
     const mediaGroupId = ctx.message!.media_group_id;
@@ -118,7 +99,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     mediaGroupId: string,
     photo: Promise<PhotoData>,
     caption: string | undefined,
-    ctx: BotContext,
+    ctx: Context,
   ) {
     let buffer = this.albumBuffers.get(mediaGroupId);
     clearTimeout(buffer?.timer);
@@ -174,30 +155,25 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processPhotos(
-    ctx: BotContext,
+    ctx: Context,
     photos: PhotoData[],
     caption: string | undefined,
   ) {
-    const threadId = ctx.chat!.id.toString();
-    const imageBlocks = photos.map((p) => ({
-      type: 'image' as const,
+    const threadId = this.getThreadId(ctx);
+    const contextImages = photos.map((p) => ({
       data: p.base64,
       mimeType: p.mimeType,
     }));
     const message = new HumanMessage({
       content: [
         ...(caption ? [{ type: 'text' as const, text: caption }] : []),
-        ...imageBlocks,
+        ...contextImages.map((img) => ({ type: 'image' as const, ...img })),
       ],
     });
-    const contextImages = imageBlocks.map(({ data, mimeType }) => ({
-      data,
-      mimeType,
-    }));
 
     await this.sendResult(
       ctx,
-      await this.aiService.run(message, threadId, contextImages),
+      await this.agentService.run(message, threadId, contextImages),
     );
   }
 
@@ -227,13 +203,10 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     return 'image/jpeg';
   }
 
-  private async sendResult(
-    ctx: BotContext,
-    result: Awaited<ReturnType<AiService['run']>>,
-  ) {
+  private async sendResult(ctx: Context, result: AgentResult) {
     const lastMessage = result.messages.at(-1);
 
-    await Promise.all(
+    const photoResults = await Promise.allSettled(
       result.artifacts
         .filter((a): a is ImageArtifact => a.type === 'image')
         .map((a) => {
@@ -243,6 +216,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           );
         }),
     );
+    const failed = photoResults.filter((r) => r.status === 'rejected').length;
+    if (failed > 0)
+      this.logger.warn(`Failed to send ${failed} artifact photo(s)`);
     await ctx.reply(serializeContent(lastMessage?.content ?? 'No response'));
+  }
+
+  private getThreadId(ctx: Context): string {
+    return ctx.chat!.id.toString();
   }
 }

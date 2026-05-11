@@ -4,7 +4,8 @@
       "Bash(npm run *)",
       "Bash(npm install *)",
       "WebFetch(domain:grammy.dev)",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.langchain.com)"
     ]
   }
 }

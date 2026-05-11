@@ -1,34 +1,19 @@
-import { MemorySaver } from '@langchain/langgraph';
-import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { GeminiModule } from '../connectors/gemini/gemini.module';
-import { CHECKPOINTER } from './ai.constants';
+import { CheckpointerModule } from '../infrastructure/checkpointer.module';
+import { AGENT_SERVICE } from './ai.constants';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { ToolsService } from './tools';
+import { GeminiToolsModule } from './tools/gemini-tools.module';
 
 @Module({
-  imports: [GeminiModule],
+  imports: [CheckpointerModule, GeminiToolsModule],
   controllers: [AiController],
   providers: [
-    {
-      provide: CHECKPOINTER,
-      useFactory: async (configService: ConfigService) => {
-        if (process.env.NODE_ENV === 'production') {
-          const saver = PostgresSaver.fromConnString(
-            configService.getOrThrow<string>('database.url'),
-          );
-          await saver.setup();
-          return saver;
-        }
-        return new MemorySaver();
-      },
-      inject: [ConfigService],
-    },
     ToolsService,
     AiService,
+    { provide: AGENT_SERVICE, useExisting: AiService },
   ],
-  exports: [AiService],
+  exports: [AGENT_SERVICE],
 })
 export class AiModule {}
