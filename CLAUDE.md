@@ -71,6 +71,24 @@ Optional: `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `NODE_E
 Production only: `DATABASE_URL` (PostgreSQL, for persistent checkpointing).
 Never commit `.env`.
 
+## Service Method Conventions
+
+Every service method takes a single typed DTO object as its only argument — no exceptions, no primitives.
+
+```typescript
+// ✓
+list(dto: ListTasksDto): Promise<Task[]>
+findDue(dto: FindDueTasksDto): Promise<Task[]>
+
+// ✗
+list(userId: string): Promise<Task[]>
+findDue(now: Date): Promise<Task[]>
+```
+
+**Why:** Adding a parameter to a method with positional arguments is a breaking change — every caller must be updated. With a DTO, new fields are added as optional properties; all existing callers continue to work without modification. The cost of wrapping one scalar in a DTO is trivial; the cost of a cross-codebase refactor when the second parameter arrives is not.
+
+**DTO naming:** `<Verb><Entity>Dto` — `CreateTaskDto`, `ListTasksDto`, `FindDueTasksDto`. Place all DTOs for a service in a colocated `*.types.ts` file. Related DTOs may use `extends`: `UpdateTaskDto extends TaskDto`.
+
 ## Testing
 
 - Unit tests: `*.spec.ts` colocated with source files

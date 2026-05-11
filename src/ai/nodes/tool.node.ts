@@ -2,7 +2,7 @@ import { ToolMessage } from '@langchain/core/messages';
 import { RunnableConfig } from '@langchain/core/runnables';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { AppState, Artifact, ArtifactSchema } from '../state';
+import { AppState, Artifact, ArtifactSchema } from '../ai.state';
 
 function artifactConfirmation(artifact: Artifact): string {
   switch (artifact.type) {

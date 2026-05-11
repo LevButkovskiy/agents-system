@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AiModule } from './ai/ai.module';
 import configuration from './configuration';
-import { TelegramModule } from './interfaces/telegram/telegram.module';
+import { DatabaseModule } from './infrastructure/database.module';
+import { TaskSchedulerModule } from './scheduler/task-scheduler.module';
 
 @Module({
   imports: [
@@ -11,8 +12,9 @@ import { TelegramModule } from './interfaces/telegram/telegram.module';
       envFilePath: '.env',
       load: [configuration],
     }),
+    DatabaseModule,
     AiModule,
-    TelegramModule,
+    TaskSchedulerModule,
   ],
 })
 export class AppModule {}

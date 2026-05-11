@@ -6,7 +6,10 @@ export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   @Post('run')
-  async run(@Body() body: { input: string; threadId: string }) {
-    return this.aiService.run(body.input, body.threadId);
+  async run(@Body() body: { input: string; threadId: string; userId: string }) {
+    return this.aiService.run(body.input, {
+      threadId: body.threadId,
+      userId: body.userId,
+    });
   }
 }

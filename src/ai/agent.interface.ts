@@ -1,15 +1,18 @@
 import { BaseMessage } from '@langchain/core/messages';
-import { Artifact, ImageInput } from './state';
+import { AgentResult, AgentRunOptions } from 'src/shared/agent.types';
+import { Artifact, ImageInput } from './ai.state';
 
-export interface AgentResult {
-  messages: BaseMessage[];
+export interface AiAgentRunOptions extends AgentRunOptions {
+  contextImages?: ImageInput[];
+}
+
+export interface AiAgentResult extends AgentResult {
   artifacts: Artifact[];
 }
 
 export interface IAgentService {
   run(
     input: string | BaseMessage,
-    threadId: string,
-    contextImages?: ImageInput[],
-  ): Promise<AgentResult>;
+    options: AiAgentRunOptions,
+  ): Promise<AiAgentResult>;
 }

@@ -2,7 +2,7 @@ import { tool } from '@langchain/core/tools';
 import { getCurrentTaskInput } from '@langchain/langgraph';
 import { z } from 'zod';
 import { GeminiService } from '../../connectors/gemini/gemini.service';
-import { AppState } from '../state';
+import { AppState } from '../ai.state';
 
 export const IMAGE_EDITOR_TOOL_NAME = 'image_editor' as const;
 

@@ -1,0 +1,1 @@
+export const REMINDER_NOTIFIER = 'REMINDER_NOTIFIER' as const;

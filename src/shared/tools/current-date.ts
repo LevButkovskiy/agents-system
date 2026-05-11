@@ -1,6 +1,6 @@
 import { tool } from '@langchain/core/tools';
 
-const currentDate = tool(
+export const currentDate = tool(
   () => {
     const now = new Date();
     return now.toISOString();
@@ -15,5 +15,3 @@ const currentDate = tool(
       'Always call this tool first before doing any date arithmetic.',
   },
 );
-
-export { currentDate };

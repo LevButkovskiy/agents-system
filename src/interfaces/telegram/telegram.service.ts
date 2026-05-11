@@ -7,12 +7,13 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Bot, Context, InputFile } from 'grammy';
+import { Bot, Context, InlineKeyboard, InputFile } from 'grammy';
 
+import type { AiAgentResult, IAgentService } from '../../ai/agent.interface';
 import { AGENT_SERVICE } from '../../ai/ai.constants';
-import type { AgentResult, IAgentService } from '../../ai/agent.interface';
-import { ImageArtifact } from '../../ai/state';
-import { serializeContent } from '../../shared/utils';
+import { ImageArtifact } from '../../ai/ai.state';
+import type { ReminderNotifier } from '../../notifications/reminder-notifier.interface';
+import { serializeContent, toTelegramMarkdownV2 } from '../../shared/utils';
 
 const ALBUM_FLUSH_MS = 1500;
 
@@ -29,10 +30,13 @@ interface AlbumBuffer {
 }
 
 @Injectable()
-export class TelegramService implements OnModuleInit, OnModuleDestroy {
+export class TelegramService
+  implements OnModuleInit, OnModuleDestroy, ReminderNotifier
+{
   private readonly logger = new Logger(TelegramService.name);
   private bot: Bot<Context>;
   private readonly albumBuffers = new Map<string, AlbumBuffer>();
+
   constructor(
     private readonly configService: ConfigService,
     @Inject(AGENT_SERVICE) private readonly agentService: IAgentService,
@@ -64,6 +68,14 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
     });
 
+    this.bot.on('callback_query:data', async (ctx) => {
+      try {
+        await this.handleCallbackQuery(ctx);
+      } catch (err) {
+        this.logger.error('Failed to handle callback query', err);
+      }
+    });
+
     void this.bot.start();
   }
 
@@ -75,10 +87,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     await this.bot.stop();
   }
 
+  async sendReminder(userId: string, text: string): Promise<void> {
+    await this.bot.api.sendMessage(userId, toTelegramMarkdownV2(text), {
+      parse_mode: 'MarkdownV2',
+    });
+  }
+
   private async handleTextMessage(ctx: Context) {
     const text = ctx.message!.text!;
-    const threadId = this.getThreadId(ctx);
-    await this.sendResult(ctx, await this.agentService.run(text, threadId));
+    const options = this.getRunOptions(ctx);
+    await this.sendResult(ctx, await this.agentService.run(text, options));
   }
 
   private async handlePhotoMessage(ctx: Context) {
@@ -93,6 +111,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.bufferAlbumPhoto(mediaGroupId, photoData, caption, ctx);
+  }
+
+  private async handleCallbackQuery(ctx: Context) {
+    const data = ctx.callbackQuery!.data!;
+    const options = this.getRunOptions(ctx);
+
+    await ctx.answerCallbackQuery();
+    await ctx.deleteMessage();
+
+    await this.sendResult(ctx, await this.agentService.run(data, options));
   }
 
   private bufferAlbumPhoto(
@@ -159,7 +187,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     photos: PhotoData[],
     caption: string | undefined,
   ) {
-    const threadId = this.getThreadId(ctx);
+    const options = this.getRunOptions(ctx);
     const contextImages = photos.map((p) => ({
       data: p.base64,
       mimeType: p.mimeType,
@@ -173,7 +201,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
     await this.sendResult(
       ctx,
-      await this.agentService.run(message, threadId, contextImages),
+      await this.agentService.run(message, { ...options, contextImages }),
     );
   }
 
@@ -203,7 +231,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     return 'image/jpeg';
   }
 
-  private async sendResult(ctx: Context, result: AgentResult) {
+  private async sendResult(ctx: Context, result: AiAgentResult) {
+    if (result.interrupt !== undefined) {
+      const keyboard = new InlineKeyboard().text('Yes', 'yes').text('No', 'no');
+      await ctx.reply(toTelegramMarkdownV2(result.interrupt), {
+        parse_mode: 'MarkdownV2',
+        reply_markup: keyboard,
+      });
+      return;
+    }
+
     const lastMessage = result.messages.at(-1);
 
     const photoResults = await Promise.allSettled(
@@ -219,10 +256,16 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     const failed = photoResults.filter((r) => r.status === 'rejected').length;
     if (failed > 0)
       this.logger.warn(`Failed to send ${failed} artifact photo(s)`);
-    await ctx.reply(serializeContent(lastMessage?.content ?? 'No response'));
+    await ctx.reply(
+      toTelegramMarkdownV2(
+        serializeContent(lastMessage?.content ?? 'No response'),
+      ),
+      { parse_mode: 'MarkdownV2' },
+    );
   }
 
-  private getThreadId(ctx: Context): string {
-    return ctx.chat!.id.toString();
+  private getRunOptions(ctx: Context) {
+    const id = ctx.chat!.id.toString();
+    return { threadId: id, userId: id };
   }
 }

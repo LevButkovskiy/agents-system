@@ -5,9 +5,10 @@ import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { ToolsService } from './tools';
 import { GeminiToolsModule } from './tools/gemini-tools.module';
+import { SchedulerToolsModule } from './tools/scheduler-tools.module';
 
 @Module({
-  imports: [CheckpointerModule, GeminiToolsModule],
+  imports: [CheckpointerModule, GeminiToolsModule, SchedulerToolsModule],
   controllers: [AiController],
   providers: [
     ToolsService,

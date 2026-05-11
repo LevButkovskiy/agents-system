@@ -50,6 +50,9 @@ export const State = new StateSchema({
   contextImages: new ReducedValue(z.array(ImageInputSchema).default([]), {
     reducer: (_x, y) => y,
   }),
+  userId: new ReducedValue(z.string().default(''), {
+    reducer: (_, next) => next,
+  }),
 });
 
 export type AppState = typeof State.State;

@@ -1,1 +1,2 @@
 export const GEMINI_TOOLS_TOKEN = 'GEMINI_TOOLS_TOKEN' as const;
+export const SCHEDULER_TOOLS_TOKEN = 'SCHEDULER_TOOLS_TOKEN' as const;
