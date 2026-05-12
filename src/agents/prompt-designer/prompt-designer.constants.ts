@@ -1,0 +1,1 @@
+export const PROMPT_DESIGNER_SERVICE = 'PROMPT_DESIGNER_SERVICE' as const;
